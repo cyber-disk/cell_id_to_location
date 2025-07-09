@@ -1,77 +1,59 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Cell ID Lookup</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Cell ID → Location (OpenCelliD)</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #0d0d1a;
-      color: #0ff;
-      text-align: center;
-      padding: 50px;
-    }
-    input {
-      padding: 10px;
-      font-size: 16px;
-      width: 250px;
-      border-radius: 5px;
-      border: none;
-      background-color: #1a1a2e;
-      color: #0ff;
-      box-shadow: 0 0 10px #0ff;
-    }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      margin-top: 15px;
-      border: none;
-      border-radius: 5px;
-      background-color: #0ff;
-      color: #000;
-      font-weight: bold;
-      cursor: pointer;
-      box-shadow: 0 0 15px #0ff;
-    }
-    button:hover {
-      background-color: #00e0ff;
-      box-shadow: 0 0 25px #00f0ff;
-    }
-    a {
-      color: #0ff;
-      display: block;
-      margin-top: 20px;
-      text-decoration: underline;
-    }
+    body { background: #111; color: #0ff; font-family: sans-serif; text-align: center; padding: 40px; }
+    input, button { font-size: 16px; padding: 10px; margin: 10px; border: 2px solid #0ff; border-radius: 5px; background: #222; color: #0ff; }
+    #map { height: 400px; margin: 20px auto; width: 80%; border: 2px solid #0ff; }
   </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 </head>
 <body>
 
-  <h1>Cell ID to Location (CellMapper)</h1>
-  <p>Enter your Cell ID (for manual lookup):</p>
-  <input type="number" id="cellIdInput" placeholder="Enter Cell ID" />
-  <br />
-  <button onclick="searchCellId()">Search</button>
+  <h1>Cell ID → Location</h1>
+  <input type="number" id="cellid" placeholder="Enter Cell ID" />
+  <button onclick="lookup()">Lookup</button>
 
-  <div id="result"></div>
+  <div id="info"></div>
+  <div id="map"></div>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    function searchCellId() {
-      const cellId = document.getElementById('cellIdInput').value;
-      const resultDiv = document.getElementById('result');
+    let map, marker;
 
-      if (!cellId) {
-        resultDiv.innerHTML = "<p>Please enter a Cell ID.</p>";
-        return;
+    async function lookup(){
+      const cid = document.getElementById('cellid').value;
+      if(!cid){ alert('Enter a Cell ID'); return; }
+      document.getElementById('info').textContent = 'Searching…';
+
+      const url = `https://opencellid.org/ajax/searchCell.php?cell_id=${encodeURIComponent(cid)}`;
+      try {
+        const res = await fetch(url);
+        if(!res.ok) throw new Error('Not found');
+        const data = await res.json();
+        if(!data.lat || !data.lon) throw new Error('No coordinates');
+        
+        const { lat, lon, range } = data;
+        document.getElementById('info').innerHTML = 
+          `📍 Coordinates: ${lat}, ${lon} (± ${range} m)`;
+
+        if(!map){
+          map = L.map('map').setView([lat,lon], 15);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
+           .addTo(map);
+        } else {
+          map.setView([lat,lon], 15);
+        }
+        if(marker) marker.remove();
+        marker = L.marker([lat,lon]).addTo(map)
+          .bindPopup('Approx Tower Location').openPopup();
+
+      } catch (e){
+        document.getElementById('info').textContent = 'Not found or API error';
       }
-
-      // CellMapper doesn’t support full search by cellId only, but we can link to general search
-      const url = `https://www.cellmapper.net/map?search=${cellId}`;
-      resultDiv.innerHTML = `
-        <p>Click the link below to search for this Cell ID on CellMapper:</p>
-        <a href="${url}" target="_blank">${url}</a>
-      `;
     }
   </script>
 
